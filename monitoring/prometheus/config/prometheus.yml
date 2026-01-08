@@ -5,6 +5,13 @@ global:
 rule_files:
   - "D:/containerized-monitoring-system/monitoring/prometheus/rules/*.yml"
 
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "localhost:9093"
+
+
 scrape_configs:
   - job_name: "flask_app"
     metrics_path: /metrics
