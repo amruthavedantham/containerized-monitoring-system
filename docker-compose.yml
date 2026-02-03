@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    container_name: flask_app
+    ports:
+      - "5000:5000"
+    networks:
+      - monitoring_net
+
+  prometheus:
+    build:
+      context: .
+      dockerfile: docker/prometheus/Dockerfile
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring_net
+    depends_on:
+      - app
+
+  grafana:
+    build:
+      context: .
+      dockerfile: docker/grafana/Dockerfile
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring_net
+    depends_on:
+      - prometheus
+
+networks:
+  monitoring_net:
+    driver: bridge
