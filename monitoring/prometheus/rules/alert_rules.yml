@@ -1,0 +1,21 @@
+groups:
+- name: application-alerts
+  rules:
+
+  - alert: ServiceDown
+    expr: up{job="flask_app"} == 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service is down"
+      description: "Prometheus cannot scrape the application metrics endpoint."
+
+  - alert: HighLatency
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m])) > 2
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High request latency"
+      description: "95th percentile latency is greater than 2 seconds for over 1 minute."

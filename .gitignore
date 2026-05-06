@@ -1,0 +1,20 @@
+# Prometheus binaries and data
+monitoring/prometheus/prometheus-*.windows-amd64/
+monitoring/prometheus/**/*.exe
+monitoring/prometheus/**/data/
+
+# Alertmanager binaries
+monitoring/alertmanager/alertmanager-*.windows-amd64/
+
+
+# Grafana binaries / data
+monitoring/grafana/data/
+monitoring/grafana/plugins/
+
+# OS / editor noise
+*.zip
+*.tar.gz
+*.exe
+*.log
+.DS_Store
+Thumbs.db
