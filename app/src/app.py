@@ -54,6 +54,7 @@ def handle_exception(e):
 def index():
     return render_template("index.html")
 
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
