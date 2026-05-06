@@ -45,6 +45,17 @@ services:
     networks:
       - monitoring_net
 
+  locust:
+    build:
+      context: .
+      dockerfile: docker/locust/Dockerfile
+    container_name: locust
+    ports:
+      - "8089:8089"
+    networks:
+      - monitoring_net
+    depends_on:
+      - app
 
 networks:
   monitoring_net:
