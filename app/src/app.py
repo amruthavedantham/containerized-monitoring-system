@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, Response
+from flask import Flask, jsonify, Response, render_template
 import time
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
@@ -48,6 +48,11 @@ def after_request(response):
 @app.errorhandler(Exception)
 def handle_exception(e):
     return jsonify({"error": "internal server error"}), 500
+
+
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
 
 
 @app.route("/health", methods=["GET"])
