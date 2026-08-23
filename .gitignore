@@ -24,3 +24,7 @@ __pycache__/
 # Locust generated exports
 load-testing/locust/dataset_exports/*.csv
 !load-testing/locust/dataset_exports/monitoring_dataset.csv
+
+# Agent artifacts
+artifacts/
+

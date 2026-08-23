@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Activity, 
   Settings, 
@@ -82,34 +82,38 @@ function App() {
   const [prediction, setPrediction] = useState(null);
   const [mlLoading, setMlLoading] = useState(false);
 
-  // Check health of backend & ML service
-  const checkHealth = async () => {
-    try {
-      const res = await fetch('/health');
-      if (res.ok) setBackendStatus('online');
-      else setBackendStatus('error');
-    } catch {
-      setBackendStatus('offline');
-    }
-
-    try {
-      const mlRes = await fetch('/predict');
-      if (mlRes.ok) {
-        setMlServiceStatus('active');
-        const data = await mlRes.json();
-        setPrediction(data);
-      } else {
-        setMlServiceStatus('error');
-      }
-    } catch {
-      setMlServiceStatus('offline');
-    }
-  };
-
   useEffect(() => {
-    checkHealth();
-    const interval = setInterval(checkHealth, 10000);
-    return () => clearInterval(interval);
+    let isMounted = true;
+    const runCheck = async () => {
+      try {
+        const res = await fetch('/health');
+        if (isMounted) setBackendStatus(res.ok ? 'online' : 'error');
+      } catch {
+        if (isMounted) setBackendStatus('offline');
+      }
+
+      try {
+        const mlRes = await fetch('/predict');
+        if (isMounted) {
+          if (mlRes.ok) {
+            setMlServiceStatus('active');
+            const data = await mlRes.json();
+            setPrediction(data);
+          } else {
+            setMlServiceStatus('error');
+          }
+        }
+      } catch {
+        if (isMounted) setMlServiceStatus('offline');
+      }
+    };
+
+    runCheck();
+    const interval = setInterval(runCheck, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const handleRunPrediction = async (featuresToUse = simParams) => {

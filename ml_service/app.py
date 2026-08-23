@@ -117,6 +117,10 @@ def poll_app_metrics_loop():
     app_url = os.getenv("APP_METRICS_URL", "http://app:5000/metrics")
     local_url = "http://127.0.0.1:5000/metrics"
 
+    last_time = None
+    last_total_reqs = None
+    last_total_errs = None
+
     while True:
         try:
             target_url = app_url
@@ -127,6 +131,7 @@ def poll_app_metrics_loop():
                 resp = requests.get(target_url, timeout=2)
 
             if resp.status_code == 200:
+                now = time.time()
                 lines = resp.text.splitlines()
                 metrics_data = {}
                 for line in lines:
@@ -145,15 +150,27 @@ def poll_app_metrics_loop():
                 total_reqs = metrics_data.get("http_requests_total", 0.0)
                 total_errs = metrics_data.get("http_errors_total", 0.0)
 
-                # Estimate rates using current snapshot metrics
+                if last_time is not None and last_total_reqs is not None and last_total_errs is not None:
+                    elapsed = max(now - last_time, 1e-3)
+                    req_rate = max((total_reqs - last_total_reqs) / elapsed, 0.0)
+                    err_rate = max((total_errs - last_total_errs) / elapsed, 0.0)
+                else:
+                    req_rate = 0.0
+                    err_rate = 0.0
+
+                last_time = now
+                last_total_reqs = total_reqs
+                last_total_errs = total_errs
+
+                # Estimate rates using counter deltas over time
                 features = {
-                    "request_rate_per_sec": min(total_reqs, 50.0),
-                    "error_rate_per_sec": min(total_errs, 10.0),
+                    "request_rate_per_sec": round(req_rate, 4),
+                    "error_rate_per_sec": round(err_rate, 4),
                     "p90_latency_seconds": 0.2 if in_progress > 0 else 0.05,
                     "requests_in_progress": in_progress
                 }
                 compute_prediction(features)
-        except Exception as e:
+        except Exception:
             # Fallback evaluation on default baseline if app isn't scraping
             pass
         time.sleep(5)
