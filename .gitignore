@@ -18,3 +18,9 @@ monitoring/grafana/plugins/
 *.log
 .DS_Store
 Thumbs.db
+*.pyc
+__pycache__/
+
+# Locust generated exports
+load-testing/locust/dataset_exports/*.csv
+!load-testing/locust/dataset_exports/monitoring_dataset.csv
