@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, Response, render_template
+from flask import Flask, jsonify, Response, render_template, g
 import time
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
@@ -30,13 +30,15 @@ http_requests_in_progress = Gauge(
 def before_request():
     http_requests_in_progress.inc()
     http_requests_total.inc()
-    app.start_time = time.time()
+    g.start_time = time.time()
 
 
 @app.after_request
 def after_request(response):
-    duration = time.time() - app.start_time
-    http_request_duration_seconds.observe(duration)
+    start_time = getattr(g, 'start_time', None)
+    if start_time is not None:
+        duration = time.time() - start_time
+        http_request_duration_seconds.observe(duration)
 
     if response.status_code >= 500:
         http_errors_total.inc()

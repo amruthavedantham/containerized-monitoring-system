@@ -128,7 +128,7 @@ To test real-time metric capture and anomaly detection:
 
 1. Open a new terminal tab at project root:
    ```bash
-   cd load-testing/locust
+   cd load-testing/locust/scripts
    ```
 
 2. Install Locust (if needed):
