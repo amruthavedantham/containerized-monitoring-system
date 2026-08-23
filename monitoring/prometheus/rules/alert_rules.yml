@@ -19,3 +19,24 @@ groups:
     annotations:
       summary: "High request latency"
       description: "95th percentile latency is greater than 2 seconds for over 1 minute."
+
+  - alert: PredictiveHighAnomalyRisk
+    expr: ml_anomaly_risk_level >= 2 or ml_anomaly_score >= 0.75
+    for: 15s
+    labels:
+      severity: critical
+      type: predictive
+    annotations:
+      summary: "Predictive High Anomaly Risk Detected"
+      description: "Isolation Forest ML model detected high risk anomaly pattern across key system metrics."
+
+  - alert: PredictiveMediumAnomalyRisk
+    expr: ml_anomaly_risk_level == 1 or (ml_anomaly_score >= 0.50 and ml_anomaly_score < 0.75)
+    for: 30s
+    labels:
+      severity: warning
+      type: predictive
+    annotations:
+      summary: "Predictive Medium Anomaly Risk Warning"
+      description: "Isolation Forest ML model detected elevated risk anomaly pattern in traffic behavior."
+
