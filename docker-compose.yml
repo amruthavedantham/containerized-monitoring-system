@@ -45,6 +45,19 @@ services:
     networks:
       - monitoring_net
 
+  ml_service:
+    build:
+      context: .
+      dockerfile: docker/ml_service/Dockerfile
+    container_name: ml_service
+    ports:
+      - "5001:5001"
+    networks:
+      - monitoring_net
+    depends_on:
+      - app
+
+
 
 networks:
   monitoring_net:
