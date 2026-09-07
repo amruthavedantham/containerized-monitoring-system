@@ -8,6 +8,8 @@ This Locust setup supports repeatable traffic scenarios for dataset collection.
 - `ramp`: gradually increasing traffic
 - `spike`: sudden jump to heavy traffic, then back down
 - `heavy`: sustained high load
+- `demo_latency`: one-minute demo where latency rises during the middle spike
+- `demo_errors`: one-minute demo where latency and the error percentage rise together
 
 ### How to Run
 
@@ -18,6 +20,8 @@ From `load-testing\locust\scripts` in PowerShell, use the wrapper script:
 .\collect_dataset.ps1 -Scenario ramp
 .\collect_dataset.ps1 -Scenario spike
 .\collect_dataset.ps1 -Scenario heavy
+.\collect_dataset.ps1 -Scenario demo_latency
+.\collect_dataset.ps1 -Scenario demo_errors
 ```
 
 If PowerShell blocks the script, run:
@@ -34,6 +38,13 @@ The built-in load shape runs each scenario automatically:
 - `ramp`: 10 -> 25 -> 50 -> 75 -> 100 users over 5 minutes
 - `spike`: 20 users, then 200 users, then back to 20 users
 - `heavy`: 100 users, then 200 users, then 300 users
+- `demo_latency`: 20 seconds baseline, 25 seconds at 150 users, then 15 seconds recovery
+- `demo_errors`: same one-minute shape as `demo_latency`
+
+The demo scenarios are designed for presentations. `demo_latency` increases the
+share of `/slow` requests during the spike without generating errors.
+`demo_errors` adds `/error` requests during that same phase, making the error
+percentage rise alongside latency.
 
 ### What You Should Do
 

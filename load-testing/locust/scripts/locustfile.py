@@ -1,4 +1,6 @@
 import os
+import random
+import time
 
 from locust import HttpUser, LoadTestShape, between, task
 
@@ -15,6 +17,8 @@ class WebsiteUser(HttpUser):
     - ramp
     - spike
     - heavy
+    - demo_latency
+    - demo_errors
     """
 
     wait_time = between(1, 3)
@@ -30,6 +34,32 @@ class WebsiteUser(HttpUser):
     @task
     def error_request(self):
         self.client.get("/error")
+
+    @task
+    def demo_request(self):
+        """Create a visible baseline, spike, and recovery for short demos."""
+        elapsed = time.time() - self.environment.runner.start_time
+        in_spike = 20 <= elapsed < 45
+
+        if SCENARIO == "demo_latency":
+            slow_probability = 0.8 if in_spike else 0.1
+            if random.random() < slow_probability:
+                self.slow_request()
+            else:
+                self.normal_request()
+        else:
+            if in_spike:
+                choice = random.random()
+                if choice < 0.3:
+                    self.error_request()
+                elif choice < 0.7:
+                    self.slow_request()
+                else:
+                    self.normal_request()
+            elif random.random() < 0.1:
+                self.slow_request()
+            else:
+                self.normal_request()
 
 
 if SCENARIO == "normal":
@@ -54,10 +84,12 @@ elif SCENARIO == "heavy":
         + [WebsiteUser.slow_request] * 4
         + [WebsiteUser.error_request] * 2
     )
+elif SCENARIO in {"demo_latency", "demo_errors"}:
+    WebsiteUser.tasks = [WebsiteUser.demo_request]
 else:
     raise ValueError(
         f"Unsupported LOCUST_SCENARIO={SCENARIO!r}. "
-        "Use normal, ramp, spike, or heavy."
+        "Use normal, ramp, spike, heavy, demo_latency, or demo_errors."
     )
 
 
@@ -86,6 +118,16 @@ class ScenarioShape(LoadTestShape):
             (90, 100, 10),
             (180, 200, 20),
             (270, 300, 30),
+        ],
+        "demo_latency": [
+            (20, 20, 10),
+            (45, 150, 50),
+            (60, 20, 10),
+        ],
+        "demo_errors": [
+            (20, 20, 10),
+            (45, 150, 50),
+            (60, 20, 10),
         ],
     }
 
