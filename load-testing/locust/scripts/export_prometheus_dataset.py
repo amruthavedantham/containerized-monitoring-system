@@ -40,6 +40,16 @@ PHASES = {
         ("heavy_200", 180),
         ("heavy_300", 270),
     ],
+    "demo_latency": [
+        ("baseline", 20),
+        ("latency_spike", 40),
+        ("recovery", 60),
+    ],
+    "demo_errors": [
+        ("baseline", 20),
+        ("error_spike", 40),
+        ("recovery", 60),
+    ],
 }
 
 

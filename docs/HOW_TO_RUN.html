@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Containerized Monitoring & Alerting System - Run Guide</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 14mm 16mm 14mm 16mm;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            background-color: #ffffff;
+            line-height: 1.45;
+            font-size: 11.5pt;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            border-bottom: 2.5px solid #4f46e5;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20pt;
+            color: #0f172a;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .header .subtitle {
+            margin: 4px 0 0 0;
+            color: #64748b;
+            font-size: 10.5pt;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 8.5pt;
+            font-weight: 700;
+            font-family: monospace;
+            text-transform: uppercase;
+        }
+        .badge-primary { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
+        .badge-success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+        .badge-warning { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .badge-danger  { background: #ffe4e6; color: #be123c; border: 1px solid #fecdd3; }
+
+        h2 {
+            font-size: 13.5pt;
+            color: #1e1b4b;
+            margin: 18px 0 8px 0;
+            padding-bottom: 4px;
+            border-bottom: 1.5px solid #e2e8f0;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        h3 {
+            font-size: 11.5pt;
+            color: #334155;
+            margin: 10px 0 4px 0;
+            font-weight: 700;
+        }
+        p {
+            margin: 4px 0 8px 0;
+        }
+        ul, ol {
+            margin: 4px 0 8px 0;
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 3px;
+        }
+        code {
+            font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 10pt;
+            border: 1px solid #e2e8f0;
+        }
+        pre {
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 9.5pt;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            margin: 6px 0 10px 0;
+            overflow-x: auto;
+            border: 1px solid #1e293b;
+        }
+        pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            border: none;
+        }
+        .code-comment { color: #94a3b8; }
+        .code-keyword { color: #38bdf8; font-weight: 600; }
+        .code-cmd     { color: #a5f3fc; }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0 12px 0;
+            font-size: 10pt;
+        }
+        .table th, .table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 10px;
+            text-align: left;
+        }
+        .table th {
+            background: #f8fafc;
+            color: #334155;
+            font-weight: 700;
+        }
+        .table tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #4f46e5;
+            padding: 8px 12px;
+            border-radius: 0 6px 6px 0;
+            margin: 8px 0 10px 0;
+            font-size: 10pt;
+        }
+        .card-alert {
+            border-left-color: #ef4444;
+            background: #fff1f2;
+        }
+        .card-warning {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+        .card-success {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 6px 0 10px 0;
+        }
+        .box {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .footer {
+            margin-top: 20px;
+            padding-top: 8px;
+            border-top: 1px solid #cbd5e1;
+            font-size: 8.5pt;
+            color: #64748b;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>How to Run: Monitoring & Alerting System</h1>
+            <div class="subtitle">Complete Quick-Reference Runbook for Docker, Local Dev, Demos & ML Intelligence</div>
+        </div>
+        <div>
+            <span class="badge badge-primary">Release 2.0</span>
+        </div>
+    </div>
+
+    <!-- Section 1: Services & Access URLs -->
+    <h2>1. System Services & Access URLs</h2>
+    <p>When running, each service exposes dedicated web interfaces and API ports:</p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Service Name</th>
+                <th>Container</th>
+                <th>Port</th>
+                <th>URL</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>React Frontend</strong></td>
+                <td><code>react_frontend</code></td>
+                <td><code>5173</code></td>
+                <td><code>http://localhost:5173</code></td>
+                <td>ML Intelligence, Live Graph & Locust Demo Runner</td>
+            </tr>
+            <tr>
+                <td><strong>Flask App</strong></td>
+                <td><code>flask_app</code></td>
+                <td><code>5000</code></td>
+                <td><code>http://localhost:5000</code></td>
+                <td>Target API, metrics generator & demo backend controller</td>
+            </tr>
+            <tr>
+                <td><strong>ML Service</strong></td>
+                <td><code>ml_service</code></td>
+                <td><code>5001</code></td>
+                <td><code>http://localhost:5001</code></td>
+                <td>Isolation Forest Anomaly Engine (<code>/predict</code>)</td>
+            </tr>
+            <tr>
+                <td><strong>Locust UI</strong></td>
+                <td><code>locust</code></td>
+                <td><code>8089</code></td>
+                <td><code>http://localhost:8089</code></td>
+                <td>Interactive load generation & scenario launcher</td>
+            </tr>
+            <tr>
+                <td><strong>Prometheus</strong></td>
+                <td><code>prometheus</code></td>
+                <td><code>9090</code></td>
+                <td><code>http://localhost:9090</code></td>
+                <td>Time-series scraping, TSDB storage & alert evaluation</td>
+            </tr>
+            <tr>
+                <td><strong>Grafana</strong></td>
+                <td><code>grafana</code></td>
+                <td><code>3000</code></td>
+                <td><code>http://localhost:3000</code></td>
+                <td>Real-time visualization dashboards (<code>admin / admin</code>)</td>
+            </tr>
+            <tr>
+                <td><strong>Alertmanager</strong></td>
+                <td><code>alertmanager</code></td>
+                <td><code>9093</code></td>
+                <td><code>http://localhost:9093</code></td>
+                <td>Deduplication, grouping & alert notifications</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Section 2: Method 1: Docker Compose -->
+    <h2>2. Running with Docker Compose (Recommended)</h2>
+    <p>The entire multi-tier system can be built and orchestrated with a single Docker command:</p>
+
+    <pre><code><span class="code-comment"># 1. Open a terminal at the project root directory</span>
+<span class="code-keyword">docker compose</span> down
+<span class="code-keyword">docker compose</span> up --build
+
+<span class="code-comment"># (Optional) Run in background detached mode:</span>
+<span class="code-keyword">docker compose</span> up --build -d</code></pre>
+
+    <div class="card card-success">
+        <strong>What this does:</strong> Builds and starts <code>flask_app</code>, <code>ml_service</code>, <code>react_frontend</code>, <code>locust</code>, <code>prometheus</code>, <code>grafana</code>, and <code>alertmanager</code> all connected via the internal <code>monitoring_net</code> Docker bridge network.
+    </div>
+
+    <h3>Verification Steps:</h3>
+    <ul>
+        <li>Open <strong>React Frontend</strong>: <code>http://localhost:5173</code> &rarr; Check API badge is <strong>Online</strong> and ML Engine is <strong>Active</strong>.</li>
+        <li>Open <strong>Prometheus Targets</strong>: <code>http://localhost:9090/targets</code> &rarr; Verify <code>flask_app</code> and <code>ml_service</code> targets are <strong>UP</strong>.</li>
+        <li>Open <strong>Grafana</strong>: <code>http://localhost:3000</code> &rarr; View pre-provisioned Flask dashboards.</li>
+    </ul>
+
+    <h3>Stopping the Docker System:</h3>
+    <pre><code><span class="code-keyword">docker compose</span> down</code></pre>
+
+    <!-- Section 3: Method 2: Running Locally -->
+    <h2>3. Running Locally (Development Mode)</h2>
+    <p>If running without Docker Desktop, launch each service in its own terminal window:</p>
+
+    <div class="grid-2">
+        <div class="box">
+            <h3>Terminal 1: Flask Backend (5000)</h3>
+            <pre><code><span class="code-comment"># From project root:</span>
+python app/src/app.py</code></pre>
+            <p style="font-size:9pt; color:#64748b;">Starts API on <code>http://localhost:5000</code> with health, metrics, and demo endpoints.</p>
+        </div>
+
+        <div class="box">
+            <h3>Terminal 2: ML Service (5001)</h3>
+            <pre><code><span class="code-comment"># From project root:</span>
+python ml_service/app.py</code></pre>
+            <p style="font-size:9pt; color:#64748b;">Loads Isolation Forest model and listens on <code>http://localhost:5001</code>.</p>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="box">
+            <h3>Terminal 3: React Frontend (5173)</h3>
+            <pre><code>cd frontend
+npm install
+npm run dev</code></pre>
+            <p style="font-size:9pt; color:#64748b;">Starts Vite dev server at <code>http://localhost:5173</code> with reverse proxy enabled.</p>
+        </div>
+
+        <div class="box">
+            <h3>Terminal 4: Locust (Optional)</h3>
+            <pre><code>cd load-testing\locust\scripts
+locust -f locustfile.py</code></pre>
+            <p style="font-size:9pt; color:#64748b;">Web UI opens at <code>http://localhost:8089</code>.</p>
+        </div>
+    </div>
+
+    <!-- Page Break for clean multi-page PDF layout -->
+    <div class="page-break"></div>
+
+    <!-- Section 4: Locust 1-Minute Demos -->
+    <h2>4. Interactive Locust 1-Minute Demo Scenarios</h2>
+    <p>Two specialized 60-second automated load scenarios are included to demonstrate observability, latency surges, and error storms:</p>
+
+    <div class="grid-2">
+        <div class="box" style="border-left: 4px solid #f59e0b;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color:#b45309;">Scenario 1: demo_latency</h3>
+                <span class="badge badge-warning">60 Seconds</span>
+            </div>
+            <p style="font-size:9.5pt; margin-top:6px;">
+                <strong>Pattern:</strong> Normal traffic (0–20s) &rarr; Surge of <code>/slow</code> requests (20–40s) &rarr; Recovery (40–60s).
+            </p>
+            <p style="font-size:9.5pt;">
+                <strong>Expected Behavior:</strong> P90 Latency elevates to ~2.0s during middle spike while error percentage stays at 0%. System fully recovers after 60s.
+            </p>
+        </div>
+
+        <div class="box" style="border-left: 4px solid #ef4444;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color:#be123c;">Scenario 2: demo_errors</h3>
+                <span class="badge badge-danger">60 Seconds</span>
+            </div>
+            <p style="font-size:9.5pt; margin-top:6px;">
+                <strong>Pattern:</strong> Normal traffic (0–20s) &rarr; Surge of both <code>/slow</code> and <code>/error</code> requests (20–40s) &rarr; Recovery (40–60s).
+            </p>
+            <p style="font-size:9.5pt;">
+                <strong>Expected Behavior:</strong> Both latency AND error percentage (~35–45%) surge during the middle spike. Triggers critical alerts and high ML risk.
+            </p>
+        </div>
+    </div>
+
+    <h3>How to Trigger Demos:</h3>
+    <ol>
+        <li><strong>Option A: One-Click from Frontend UI (Easiest)</strong><br>
+            Navigate to <code>http://localhost:5173</code> &rarr; In the <strong>Interactive Locust Demo Scenarios</strong> section, click either:
+            <ul>
+                <li><button style="padding:2px 8px; border-radius:4px; border:1px solid #f59e0b; background:#fffbeb; font-weight:700; cursor:pointer;">Run Latency Demo</button></li>
+                <li><button style="padding:2px 8px; border-radius:4px; border:1px solid #ef4444; background:#fff1f2; font-weight:700; cursor:pointer;">Run Latency + Errors Demo</button></li>
+            </ul>
+            <em>Displays 60s countdown, real-time request rate, P90 latency, error rate, and live graph plotting.</em>
+        </li>
+
+        <li><strong>Option B: Via PowerShell CLI</strong><br>
+            Run directly from PowerShell without opening a browser:
+            <pre><code>cd load-testing\locust\scripts
+.\collect_dataset.ps1 -Scenario demo_latency
+<span class="code-comment"># OR</span>
+.\collect_dataset.ps1 -Scenario demo_errors</code></pre>
+        </li>
+
+        <li><strong>Option C: Via REST API</strong><br>
+            <pre><code><span class="code-comment"># Start demo:</span>
+curl -X POST http://localhost:5000/api/demos/start -H "Content-Type: application/json" -d "{\"scenario\": \"demo_latency\"}"
+
+<span class="code-comment"># Poll status:</span>
+curl http://localhost:5000/api/demos/active</code></pre>
+        </li>
+    </ol>
+
+    <div class="card card-warning">
+        <strong>Concurrency Protection:</strong> Only one demo can run at any time. Attempting to start a second demo while one is running returns an <code>HTTP 409 Conflict</code> error with the remaining seconds.
+    </div>
+
+    <!-- Section 5: Frontend Key Features -->
+    <h2>5. Frontend Key Features & Live Testing</h2>
+
+    <h3>A. Real-Time Inputs Graph (Traffic, Latency, Errors)</h3>
+    <ul>
+        <li>Renders live time-series SVG curves for <strong>Traffic Rate</strong> (Indigo), <strong>P90 Latency</strong> (Amber), and <strong>Error Rate</strong> (Rose).</li>
+        <li>Hover over any point to view exact timestamp and metric values. Toggle series pills to hide/isolate specific metrics.</li>
+        <li>Updates automatically every 2–3s, during Locust demo spikes, or when custom inputs are evaluated.</li>
+    </ul>
+
+    <h3>B. Anomaly Simulator & Custom Input Evaluation</h3>
+    <ul>
+        <li>Adjust the 4 input sliders (Request Rate, Error Rate, P90 Latency, Requests In-Progress) or click any preset (<em>Normal Baseline</em>, <em>Ramp Up Load</em>, <em>Traffic Spike</em>, <em>Heavy Error Storm</em>).</li>
+        <li>Click <strong>Evaluate Custom Inputs</strong> &rarr; The status immediately updates to <code>High Risk</code>, <code>Medium Risk</code>, or <code>Normal</code> with updated triggers and meter.</li>
+        <li>Click <strong>Reset Live</strong> to return to live background metrics polling.</li>
+    </ul>
+
+    <h3>C. Offline Status Test (Simulating API Down)</h3>
+    <ol>
+        <li>Stop the Flask backend process or container: <code>docker stop flask_app</code> (or press <code>Ctrl + C</code> in Terminal 1).</li>
+        <li>Watch the Status Hero Banner immediately turn <strong>RED</strong> displaying:
+            <div style="margin-top:4px; padding:6px 10px; background:#fff1f2; border:1px solid #fecdd3; border-radius:6px; color:#be123c; font-weight:700; font-size:9.5pt;">
+                Status: App is Down &nbsp;|&nbsp; [OFFLINE] &nbsp;|&nbsp; Port 5000 Unreachable
+            </div>
+        </li>
+        <li>Restart the backend (<code>docker start flask_app</code> or <code>python app/src/app.py</code>) &rarr; Status recovers to green/normal automatically.</li>
+    </ol>
+
+    <!-- Footer -->
+    <div class="footer">
+        <span>Containerized Monitoring & Alerting System • DevOps Run Guide</span>
+        <span>Generated: September 2026 • Verified on Windows / Docker / Linux</span>
+    </div>
+
+</body>
+</html>

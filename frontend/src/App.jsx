@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Activity, 
   Settings, 
@@ -20,8 +20,12 @@ import {
   RefreshCw,
   Sliders,
   Layers,
-  Sparkles
+  Sparkles,
+  Radio,
+  RotateCcw
 } from 'lucide-react';
+import LiveMetricsGraph from './components/LiveMetricsGraph';
+import LocustDemoRunner from './components/LocustDemoRunner';
 
 const ENDPOINTS = [
   { path: '/health', name: 'Health Check', icon: Activity, description: 'Verifies if the API is running correctly.', color: 'text-emerald-400' },
@@ -58,6 +62,21 @@ const PRESET_SCENARIOS = [
   }
 ];
 
+function generateInitialHistory() {
+  const points = [];
+  const now = Date.now();
+  for (let i = 15; i >= 0; i--) {
+    const t = new Date(now - i * 3000);
+    points.push({
+      time: t.toTimeString().split(' ')[0],
+      traffic: 8.5,
+      latency: 0.21,
+      errors: 0.0
+    });
+  }
+  return points;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('ml_dashboard');
   const [backendStatus, setBackendStatus] = useState('checking');
@@ -71,7 +90,7 @@ function App() {
   const [statusCode, setStatusCode] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  // ML Prediction state
+  // ML Prediction & Custom Inputs state
   const [simParams, setSimParams] = useState({
     request_rate_per_sec: 8.5,
     error_rate_per_sec: 0.0,
@@ -81,13 +100,21 @@ function App() {
 
   const [prediction, setPrediction] = useState(null);
   const [mlLoading, setMlLoading] = useState(false);
+  const [isCustomMode, setIsCustomMode] = useState(false);
 
+  // Live Metrics Graph history state
+  const [metricsHistory, setMetricsHistory] = useState(generateInitialHistory);
+  const isCustomModeRef = useRef(isCustomMode);
+  isCustomModeRef.current = isCustomMode;
+
+  // Background health & status polling
   useEffect(() => {
     let isMounted = true;
-    const runCheck = async () => {
+
+    const runHealthCheck = async () => {
       try {
         const res = await fetch('/health');
-        if (isMounted) setBackendStatus(res.ok ? 'online' : 'error');
+        if (isMounted) setBackendStatus(res.ok ? 'online' : 'offline');
       } catch {
         if (isMounted) setBackendStatus('offline');
       }
@@ -98,7 +125,10 @@ function App() {
           if (mlRes.ok) {
             setMlServiceStatus('active');
             const data = await mlRes.json();
-            setPrediction(data);
+            // Only update prediction from polling if user is not evaluating custom inputs
+            if (!isCustomModeRef.current) {
+              setPrediction(data);
+            }
           } else {
             setMlServiceStatus('error');
           }
@@ -108,16 +138,71 @@ function App() {
       }
     };
 
-    runCheck();
-    const interval = setInterval(runCheck, 10000);
+    runHealthCheck();
+    const interval = setInterval(runHealthCheck, 8000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, []);
 
-  const handleRunPrediction = async (featuresToUse = simParams) => {
+  // Poll real-time metrics for graph updates when not in active Locust demo
+  useEffect(() => {
+    const pollRealtimeMetrics = async () => {
+      if (backendStatus === 'offline') return;
+      try {
+        const res = await fetch('/api/metrics/realtime');
+        if (res.ok) {
+          const data = await res.json();
+          const nowStr = new Date().toTimeString().split(' ')[0];
+          setMetricsHistory(prev => [
+            ...prev.slice(-29),
+            {
+              time: nowStr,
+              traffic: data.request_rate_per_sec ?? 0,
+              latency: data.p90_latency_seconds ?? 0,
+              errors: data.error_percentage ?? 0
+            }
+          ]);
+        }
+      } catch {
+        // Backend not serving realtime endpoint or offline
+      }
+    };
+
+    const metricInterval = setInterval(pollRealtimeMetrics, 3000);
+    return () => clearInterval(metricInterval);
+  }, [backendStatus]);
+
+  // Handler for metrics streaming from active Locust demo runner
+  const handleDemoMetricsUpdate = (newMetrics) => {
+    const nowStr = new Date().toTimeString().split(' ')[0];
+    setMetricsHistory(prev => [
+      ...prev.slice(-29),
+      {
+        time: nowStr,
+        traffic: newMetrics.traffic,
+        latency: newMetrics.latency,
+        errors: newMetrics.errors
+      }
+    ]);
+
+    // Also update simParams and trigger ML prediction update to reflect the surge live
+    const updatedFeatures = {
+      request_rate_per_sec: newMetrics.traffic,
+      error_rate_per_sec: newMetrics.raw?.error_rate_per_sec ?? (newMetrics.traffic * (newMetrics.errors / 100)),
+      p90_latency_seconds: newMetrics.latency,
+      requests_in_progress: newMetrics.raw?.requests_in_progress ?? 10
+    };
+    setSimParams(updatedFeatures);
+    handleRunPrediction(updatedFeatures, false);
+  };
+
+  // Run ML prediction evaluation
+  const handleRunPrediction = async (featuresToUse = simParams, markCustom = true) => {
     setMlLoading(true);
+    if (markCustom) setIsCustomMode(true);
+
     try {
       const res = await fetch('/predict', {
         method: 'POST',
@@ -128,7 +213,7 @@ function App() {
         const data = await res.json();
         setPrediction(data);
       } else {
-        // Try fallback GET query params
+        // Fallback GET query params
         const params = new URLSearchParams(featuresToUse).toString();
         const getRes = await fetch(`/predict?${params}`);
         if (getRes.ok) {
@@ -136,6 +221,18 @@ function App() {
           setPrediction(data);
         }
       }
+
+      // Append evaluated custom values to live metrics graph
+      const nowStr = new Date().toTimeString().split(' ')[0];
+      setMetricsHistory(prev => [
+        ...prev.slice(-29),
+        {
+          time: nowStr,
+          traffic: featuresToUse.request_rate_per_sec || 0,
+          latency: featuresToUse.p90_latency_seconds || 0,
+          errors: featuresToUse.error_rate_per_sec || 0
+        }
+      ]);
     } catch (err) {
       console.error('Prediction failed:', err);
     } finally {
@@ -145,7 +242,19 @@ function App() {
 
   const applyPreset = (preset) => {
     setSimParams(preset.features);
-    handleRunPrediction(preset.features);
+    handleRunPrediction(preset.features, true);
+  };
+
+  const handleResetToBaseline = () => {
+    setIsCustomMode(false);
+    const baseline = {
+      request_rate_per_sec: 8.5,
+      error_rate_per_sec: 0.0,
+      p90_latency_seconds: 0.21,
+      requests_in_progress: 3.0
+    };
+    setSimParams(baseline);
+    handleRunPrediction(baseline, false);
   };
 
   const handleEndpointClick = async (endpoint) => {
@@ -187,10 +296,43 @@ function App() {
     }
   };
 
+  const isApiOffline = backendStatus === 'offline';
+
   const getStatusTheme = (status) => {
-    if (status === 'High Risk') return { bg: 'bg-rose-500/10', border: 'border-rose-500/30', text: 'text-rose-400', badgeBg: 'bg-rose-500', pingBg: 'bg-rose-400' };
-    if (status === 'Medium Risk') return { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400', badgeBg: 'bg-amber-500', pingBg: 'bg-amber-400' };
-    return { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', badgeBg: 'bg-emerald-500', pingBg: 'bg-emerald-400' };
+    if (isApiOffline) {
+      return { 
+        bg: 'bg-rose-950/40', 
+        border: 'border-rose-500/80 shadow-2xl shadow-rose-950/70', 
+        text: 'text-rose-400', 
+        badgeBg: 'bg-rose-600', 
+        pingBg: 'bg-rose-500' 
+      };
+    }
+    if (status === 'High Risk') {
+      return { 
+        bg: 'bg-rose-500/10', 
+        border: 'border-rose-500/40 shadow-xl shadow-rose-500/5', 
+        text: 'text-rose-400', 
+        badgeBg: 'bg-rose-500', 
+        pingBg: 'bg-rose-400' 
+      };
+    }
+    if (status === 'Medium Risk') {
+      return { 
+        bg: 'bg-amber-500/10', 
+        border: 'border-amber-500/40 shadow-xl shadow-amber-500/5', 
+        text: 'text-amber-400', 
+        badgeBg: 'bg-amber-500', 
+        pingBg: 'bg-amber-400' 
+      };
+    }
+    return { 
+      bg: 'bg-emerald-500/10', 
+      border: 'border-emerald-500/30 shadow-xl shadow-emerald-500/5', 
+      text: 'text-emerald-400', 
+      badgeBg: 'bg-emerald-500', 
+      pingBg: 'bg-emerald-400' 
+    };
   };
 
   const currentTheme = getStatusTheme(prediction?.risk_level);
@@ -221,11 +363,15 @@ function App() {
 
           <div className="relative z-10 flex flex-wrap items-center gap-3">
             {/* Status Pills */}
-            <div className="flex items-center gap-2 bg-slate-950/80 px-3.5 py-1.5 rounded-full border border-slate-800 text-xs font-medium">
+            <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-medium ${
+              backendStatus === 'online' 
+                ? 'bg-slate-950/80 border-slate-800 text-slate-200' 
+                : 'bg-rose-950/60 border-rose-500/50 text-rose-300'
+            }`}>
               <span className="text-slate-400">API:</span>
-              <span className="flex items-center gap-1.5 capitalize text-slate-200">
-                <span className={`w-2 h-2 rounded-full ${backendStatus === 'online' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                {backendStatus}
+              <span className="flex items-center gap-1.5 capitalize font-semibold">
+                <span className={`w-2 h-2 rounded-full ${backendStatus === 'online' ? 'bg-emerald-500' : 'bg-rose-500 animate-ping'}`} />
+                {backendStatus === 'online' ? 'Online' : 'Down (Offline)'}
               </span>
             </div>
 
@@ -244,7 +390,7 @@ function App() {
             <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
               <button
                 onClick={() => setActiveTab('ml_dashboard')}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                   activeTab === 'ml_dashboard' 
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
                     : 'text-slate-400 hover:text-slate-200'
@@ -255,7 +401,7 @@ function App() {
 
               <button
                 onClick={() => setActiveTab('api_panel')}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                   activeTab === 'api_panel' 
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
                     : 'text-slate-400 hover:text-slate-200'
@@ -274,54 +420,69 @@ function App() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               
               {/* Prediction Hero Banner */}
-              <div className={`lg:col-span-7 rounded-2xl p-6 md:p-8 border ${currentTheme.bg} ${currentTheme.border} backdrop-blur-xl relative overflow-hidden flex flex-col justify-between`}>
+              <div className={`lg:col-span-7 rounded-2xl p-6 md:p-8 border ${currentTheme.bg} ${currentTheme.border} backdrop-blur-xl relative overflow-hidden flex flex-col justify-between transition-all duration-500`}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">
-                      <Sparkles className="w-4 h-4 text-indigo-400" /> Isolation Forest Model Output
+                      <Sparkles className={`w-4 h-4 ${isApiOffline ? 'text-rose-400' : 'text-indigo-400'}`} /> 
+                      {isApiOffline ? 'API Connectivity Failure' : 'Isolation Forest Model Output'}
                     </div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-4xl font-extrabold tracking-tight text-white">
-                        Status: <span className={currentTheme.text}>{prediction?.risk_level || 'Evaluating...'}</span>
+                      <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                        Status: <span className={currentTheme.text}>
+                          {isApiOffline ? 'App is Down' : (prediction?.risk_level || 'Evaluating...')}
+                        </span>
                       </h2>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/60 border border-white/10">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/80 border border-white/10 shrink-0">
                     <span className="relative flex h-3 w-3">
                       <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${currentTheme.pingBg} opacity-75`}></span>
                       <span className={`relative inline-flex rounded-full h-3 w-3 ${currentTheme.badgeBg}`}></span>
                     </span>
                     <span className="text-xs font-bold font-mono text-slate-200">
-                      Code {prediction?.risk_code ?? 0}
+                      {isApiOffline ? 'OFFLINE' : `Code ${prediction?.risk_code ?? 0}`}
                     </span>
                   </div>
                 </div>
 
-                {/* Risk Explanation */}
+                {/* Risk Explanation or Offline Alert */}
                 <div className="my-6 space-y-3">
                   <p className="text-slate-300 text-sm leading-relaxed">
-                    {prediction?.risk_level === 'High Risk' && 'Severe metric anomaly detected. Multiple parameters deviate significantly from trained baseline normal thresholds.'}
-                    {prediction?.risk_level === 'Medium Risk' && 'Elevated metric variation observed. Traffic load or error distribution is drifting from baseline norms.'}
-                    {prediction?.risk_level === 'Normal' && 'System metrics operate smoothly within expected Isolation Forest baseline parameters.'}
+                    {isApiOffline && 'CRITICAL: The backend Flask API is offline or unreachable. Request processing is down and metrics cannot be refreshed.'}
+                    {!isApiOffline && prediction?.risk_level === 'High Risk' && 'Severe metric anomaly detected! Multiple parameters deviate significantly from baseline normal thresholds.'}
+                    {!isApiOffline && prediction?.risk_level === 'Medium Risk' && 'Elevated metric variation observed. Traffic load, latency, or errors are drifting from baseline norms.'}
+                    {!isApiOffline && prediction?.risk_level === 'Normal' && 'System metrics operate smoothly within expected Isolation Forest baseline parameters.'}
                   </p>
 
-                  {prediction?.affected_metrics && prediction.affected_metrics.length > 0 && (
+                  {isApiOffline ? (
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <span className="text-xs font-semibold text-slate-400 self-center">Triggers:</span>
-                      {prediction.affected_metrics.map((metric, idx) => (
-                        <span key={idx} className="px-2.5 py-1 rounded-md bg-slate-950/80 border border-rose-500/30 text-rose-300 text-xs font-mono">
-                          {metric}
-                        </span>
-                      ))}
+                      <span className="px-2.5 py-1 rounded-md bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-mono flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-400" /> Backend Service Down
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-mono">
+                        Port 5000 Unreachable
+                      </span>
                     </div>
+                  ) : (
+                    prediction?.affected_metrics && prediction.affected_metrics.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <span className="text-xs font-semibold text-slate-400 self-center">Triggers:</span>
+                        {prediction.affected_metrics.map((metric, idx) => (
+                          <span key={idx} className="px-2.5 py-1 rounded-md bg-slate-950/80 border border-rose-500/30 text-rose-300 text-xs font-mono">
+                            {metric}
+                          </span>
+                        ))}
+                      </div>
+                    )
                   )}
                 </div>
 
                 {/* Footer Metrics */}
                 <div className="pt-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
                   <span>Timestamp: <span className="font-mono text-slate-200">{prediction?.timestamp_utc || 'N/A'}</span></span>
-                  <span>Raw Score: <span className="font-mono text-slate-200">{prediction?.raw_score ?? '0.00'}</span></span>
+                  <span>Raw Score: <span className="font-mono text-slate-200">{isApiOffline ? 'N/A' : (prediction?.raw_score ?? '0.00')}</span></span>
                 </div>
               </div>
 
@@ -331,8 +492,8 @@ function App() {
                   <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                     <Gauge className="w-4 h-4 text-indigo-400" /> Anomaly Score Meter
                   </h3>
-                  <span className="text-2xl font-mono font-extrabold text-white">
-                    {prediction ? prediction.anomaly_score.toFixed(2) : '0.00'}
+                  <span className={`text-2xl font-mono font-extrabold ${isApiOffline ? 'text-rose-400' : 'text-white'}`}>
+                    {isApiOffline ? '1.00 (Down)' : (prediction ? prediction.anomaly_score.toFixed(2) : '0.00')}
                   </span>
                 </div>
 
@@ -341,11 +502,14 @@ function App() {
                   <div className="relative w-full h-5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${
+                        isApiOffline ? 'bg-gradient-to-r from-rose-600 to-rose-500' :
                         (prediction?.anomaly_score || 0) >= 0.75 ? 'bg-gradient-to-r from-amber-500 to-rose-500' :
                         (prediction?.anomaly_score || 0) >= 0.50 ? 'bg-gradient-to-r from-emerald-500 to-amber-500' :
                         'bg-gradient-to-r from-indigo-500 to-emerald-500'
                       }`}
-                      style={{ width: `${Math.min(Math.max((prediction?.anomaly_score || 0) * 100, 4), 100)}%` }}
+                      style={{ 
+                        width: isApiOffline ? '100%' : `${Math.min(Math.max((prediction?.anomaly_score || 0) * 100, 4), 100)}%` 
+                      }}
                     />
                   </div>
 
@@ -363,6 +527,16 @@ function App() {
               </div>
 
             </div>
+
+            {/* Live Metrics Graph (Traffic, Latency, Errors) */}
+            <LiveMetricsGraph
+              history={metricsHistory}
+              currentMetrics={simParams}
+              isDemoRunning={false}
+            />
+
+            {/* Interactive Locust Demo Runner Section */}
+            <LocustDemoRunner onMetricsUpdate={handleDemoMetricsUpdate} />
 
             {/* Feature Health Matrix (4 Metric Cards) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -400,14 +574,25 @@ function App() {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => handleRunPrediction(simParams)}
-                  disabled={mlLoading}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all self-start md:self-auto"
-                >
-                  <RefreshCw className={`w-4 h-4 ${mlLoading ? 'animate-spin' : ''}`} />
-                  Evaluate Custom Inputs
-                </button>
+                <div className="flex items-center gap-3">
+                  {isCustomMode && (
+                    <button
+                      onClick={handleResetToBaseline}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset Live
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => handleRunPrediction(simParams, true)}
+                    disabled={mlLoading}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${mlLoading ? 'animate-spin' : ''}`} />
+                    Evaluate Custom Inputs
+                  </button>
+                </div>
               </div>
 
               {/* Preset Buttons */}
@@ -416,7 +601,7 @@ function App() {
                   <button
                     key={idx}
                     onClick={() => applyPreset(preset)}
-                    className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900/80 transition-all text-left group"
+                    className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900/80 transition-all text-left group cursor-pointer"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <preset.icon className={`w-4 h-4 text-${preset.color}-400`} />
@@ -549,7 +734,7 @@ function App() {
                   <button
                     key={endpoint.path}
                     onClick={() => handleEndpointClick(endpoint)}
-                    className={`text-left p-4 rounded-xl transition-all duration-300 border relative overflow-hidden group
+                    className={`text-left p-4 rounded-xl transition-all duration-300 border relative overflow-hidden group cursor-pointer
                       ${activeEndpoint?.path === endpoint.path 
                         ? 'bg-slate-800/80 border-indigo-500/50 shadow-lg shadow-indigo-500/10' 
                         : 'bg-slate-900/40 border-slate-800/50 hover:bg-slate-800/60 hover:border-slate-700/50'
@@ -625,7 +810,7 @@ function App() {
                     <div className="relative h-full">
                       <button 
                         onClick={copyToClipboard}
-                        className="absolute top-2 right-2 p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors z-10"
+                        className="absolute top-2 right-2 p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors z-10 cursor-pointer"
                         title="Copy to clipboard"
                       >
                         {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}

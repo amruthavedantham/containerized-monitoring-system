@@ -9,6 +9,13 @@ import joblib
 
 app = Flask(__name__)
 
+@app.after_request
+def after_request(response):
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    return response
+
 # Prometheus Metrics exposed by ML Service
 gauge_anomaly_score = Gauge("ml_anomaly_score", "Normalized Isolation Forest Anomaly Score (0.0 to 1.0)")
 gauge_risk_level = Gauge("ml_anomaly_risk_level", "Anomaly Risk Level Code: 0=Normal, 1=Medium Risk, 2=High Risk")
@@ -59,29 +66,39 @@ def compute_prediction(features):
     score_min = model_artifact.get("score_min", -0.23)
     denom = max(score_max - score_min, 1e-5)
 
-    # Anomaly score: 0.0 = normal, 1.0 = highly anomalous
-    anomaly_score = float(np.clip((score_max - raw_score) / denom, 0.0, 1.0))
+    # Determine affected metrics deviating from normal baseline
+    affected_metrics = []
+    err_rate = float(features.get("error_rate_per_sec", 0.0))
+    p90_lat = float(features.get("p90_latency_seconds", 0.0))
+    req_rate = float(features.get("request_rate_per_sec", 0.0))
+    in_prog = float(features.get("requests_in_progress", 0.0))
 
-    if anomaly_score >= 0.75:
+    if err_rate > 0.5:
+        affected_metrics.append("High HTTP Error Rate")
+    if p90_lat > 0.4:
+        affected_metrics.append("Elevated P90 Latency")
+    if req_rate > 30.0:
+        affected_metrics.append("High Request Rate Load")
+    if in_prog > 15:
+        affected_metrics.append("High Concurrent Requests")
+
+    # Base anomaly score from Isolation Forest model
+    model_score = float(np.clip((score_max - raw_score) / denom, 0.0, 1.0))
+
+    # Evaluate risk level based on model score and active metric triggers
+    # This ensures evaluated custom inputs immediately reflect risk when triggers fire
+    if err_rate > 2.0 or (err_rate > 0.5 and p90_lat > 0.4) or len(affected_metrics) >= 2 or model_score >= 0.75:
         risk_level = "High Risk"
         risk_code = 2
-    elif anomaly_score >= 0.50:
+        anomaly_score = max(model_score, 0.82)
+    elif len(affected_metrics) >= 1 or model_score >= 0.50:
         risk_level = "Medium Risk"
         risk_code = 1
+        anomaly_score = max(model_score, 0.58)
     else:
         risk_level = "Normal"
         risk_code = 0
-
-    # Determine affected metrics deviating from normal baseline
-    affected_metrics = []
-    if features.get("error_rate_per_sec", 0) > 0.5:
-        affected_metrics.append("High HTTP Error Rate")
-    if features.get("p90_latency_seconds", 0) > 0.5:
-        affected_metrics.append("Elevated P90 Latency")
-    if features.get("request_rate_per_sec", 0) > 30.0:
-        affected_metrics.append("High Request Rate Load")
-    if features.get("requests_in_progress", 0) > 15:
-        affected_metrics.append("High Concurrent Requests")
+        anomaly_score = min(model_score, 0.22)
 
     if not affected_metrics and risk_code > 0:
         affected_metrics.append("Unusual Metric Pattern Combination")

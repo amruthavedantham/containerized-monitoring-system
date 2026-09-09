@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("normal", "ramp", "spike", "heavy")]
+    [ValidateSet("normal", "ramp", "spike", "heavy", "demo_latency", "demo_errors")]
     [string]$Scenario,
 
     [string]$HostUrl = "http://localhost:5000",

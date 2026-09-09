@@ -12,6 +12,7 @@ export default defineConfig({
       '/slow': 'http://127.0.0.1:5000',
       '/error': 'http://127.0.0.1:5000',
       '/metrics': 'http://127.0.0.1:5000',
+      '/api': 'http://127.0.0.1:5000',
       '/predict': 'http://127.0.0.1:5001',
       '/ml': {
         target: 'http://127.0.0.1:5001',

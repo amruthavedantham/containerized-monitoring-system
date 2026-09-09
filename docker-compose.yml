@@ -57,7 +57,30 @@ services:
     depends_on:
       - app
 
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: react_frontend
+    ports:
+      - "5173:80"
+    networks:
+      - monitoring_net
+    depends_on:
+      - app
+      - ml_service
 
+  locust:
+    build:
+      context: .
+      dockerfile: docker/locust/Dockerfile
+    container_name: locust
+    ports:
+      - "8089:8089"
+    networks:
+      - monitoring_net
+    depends_on:
+      - app
 
 networks:
   monitoring_net:
