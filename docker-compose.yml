@@ -6,6 +6,16 @@ services:
     container_name: flask_app
     ports:
       - "5000:5000"
+    environment:
+      # Demo Locust is launched inside this container, so it must call its own
+      # Flask listener rather than another container's localhost.
+      FLASK_HOST_URL: http://127.0.0.1:5000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
     networks:
       - monitoring_net
 
@@ -19,7 +29,8 @@ services:
     networks:
       - monitoring_net
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
   grafana:
     build:
@@ -31,7 +42,8 @@ services:
     networks:
       - monitoring_net
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
     volumes:
       - grafana_data:/var/lib/grafana
 
@@ -52,10 +64,19 @@ services:
     container_name: ml_service
     ports:
       - "5001:5001"
+    environment:
+      APP_METRICS_URL: http://app:5000/metrics
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
     networks:
       - monitoring_net
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
   frontend:
     build:
@@ -67,8 +88,10 @@ services:
     networks:
       - monitoring_net
     depends_on:
-      - app
-      - ml_service
+      app:
+        condition: service_healthy
+      ml_service:
+        condition: service_healthy
 
   locust:
     build:
@@ -80,7 +103,8 @@ services:
     networks:
       - monitoring_net
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
 networks:
   monitoring_net:

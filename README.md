@@ -6,11 +6,12 @@ It includes a small Flask observability service, a React frontend for testing ba
 
 ## First-Time Setup
 
-If you are running this project for the first time, start here:
+For the supported Docker Compose setup, start here:
 
-[FIRST_TIME_RUNBOOK.md](FIRST_TIME_RUNBOOK.md)
+[docs/HOW_TO_RUN_GUIDE.md](docs/HOW_TO_RUN_GUIDE.md)
 
-The runbook contains the full setup, execution steps, Grafana dashboard import instructions, Locust configuration, alert demonstration flow, shutdown steps, and troubleshooting notes.
+The guide documents the single-command container startup, endpoint checks,
+Locust demos, Grafana, Prometheus, and Alertmanager verification.
 
 ## What This Project Includes
 
@@ -91,17 +92,19 @@ Locust:       http://localhost:8089
 Start Docker Desktop first, then run the Docker services from the project root:
 
 ```powershell
-docker compose down
-docker compose up --build
+docker compose up -d --build
 ```
 
-Run the frontend in a separate terminal:
+`docker compose up -d --build` is the supported startup command for a fresh
+clone and after source or dependency changes. Compose uses the Dockerfiles'
+explicit `COPY` inputs, so changes to Flask, ML, model, frontend, or Locust
+source create an updated image and recreate the affected service. Do not copy
+files into containers or rebuild individual services manually.
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
+The frontend's demo controls launch a short headless Locust process inside the
+Flask container. The `locust` Compose service remains available at port 8089
+for its interactive web UI. The Compose frontend is served at port 5173; a
+local Vite frontend is optional development-only tooling.
 
 Run Locust only when load testing is needed:
 

@@ -2,7 +2,11 @@ FROM python:3.10-slim
 
 WORKDIR /locust
 
-RUN pip install --no-cache-dir locust requests pandas numpy
+RUN pip install --no-cache-dir \
+    locust==2.46.0 \
+    requests==2.32.2 \
+    pandas==2.2.0 \
+    numpy==1.26.4
 
 COPY load-testing/locust /locust
 

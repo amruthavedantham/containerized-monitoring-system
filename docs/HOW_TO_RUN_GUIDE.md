@@ -24,12 +24,17 @@ To build and start all 7 services in containers connected via `monitoring_net`:
 
 ```powershell
 # From project root:
-docker compose down
-docker compose up --build
-
-# Or in detached background mode:
-docker compose up --build -d
+docker compose up -d --build
 ```
+
+This is the only required startup command for a fresh clone and after source
+or dependency updates. The Dockerfiles copy the Flask, ML/model, frontend, and
+Locust source as explicit build inputs, so Compose rebuilds and recreates an
+affected service when those inputs change. Do not copy files into containers or
+manually rebuild selected services.
+
+The frontend's demo buttons launch headless Locust inside `flask_app`; the
+separate `locust` service at port 8089 provides the interactive Locust UI.
 
 ### Verification
 1. Open **React Frontend**: [http://localhost:5173](http://localhost:5173) &rarr; API shows **Online** and ML Engine shows **Active**.
