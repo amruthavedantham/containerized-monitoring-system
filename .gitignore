@@ -18,3 +18,17 @@ monitoring/grafana/plugins/
 *.log
 .DS_Store
 Thumbs.db
+*.pyc
+__pycache__/
+node_modules/
+dist/
+frontend/node_modules/
+frontend/dist/
+
+# Locust generated exports
+load-testing/locust/dataset_exports/*.csv
+!load-testing/locust/dataset_exports/monitoring_dataset.csv
+
+# Agent artifacts
+artifacts/
+

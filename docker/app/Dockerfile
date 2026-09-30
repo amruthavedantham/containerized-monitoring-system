@@ -2,8 +2,9 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Copy entire app folder
+# Copy app folder and load-testing folder
 COPY app /app
+COPY load-testing /load-testing
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements/requirements.txt
